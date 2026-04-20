@@ -1,0 +1,37 @@
+name: phishing_response
+description: Automated phishing email response and containment
+trigger: phishing
+severity: HIGH
+avg_execution_time: 35s
+mitre_tactics:
+  - "TA0001 - Initial Access"
+  - "T1566 - Phishing"
+
+steps:
+  - action: enrich_ioc
+    description: Enrich sender domain and embedded URLs via VirusTotal
+    required: true
+
+  - action: quarantine_email
+    description: Quarantine phishing email from all affected mailboxes
+    required: true
+
+  - action: block_sender
+    description: Block malicious sender at email gateway (SPF/DMARC enforcement)
+    required: true
+
+  - action: notify_team
+    description: Alert SOC team via Slack with enrichment details
+    required: true
+
+  - action: create_ticket
+    description: Create Jira incident ticket with full context
+    required: false
+
+  - action: force_password_reset
+    description: Initiate password reset for users who interacted with email
+    required: false
+
+  - action: collect_forensics
+    description: Preserve email headers, attachments, and access logs
+    required: true

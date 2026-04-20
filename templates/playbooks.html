@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARISE SOAR | Playbooks</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo"><span class="logo-icon">⚔️</span><span class="logo-text">ARISE</span><span class="logo-sub">SOAR</span></div>
+    <ul class="nav-links">
+      <li><a href="/"><span>📊</span> Dashboard</a></li>
+      <li><a href="/alerts"><span>🚨</span> Alerts</a></li>
+      <li><a href="/cases"><span>📁</span> Cases</a></li>
+      <li class="active"><a href="/playbooks"><span>⚙️</span> Playbooks</a></li>
+    </ul>
+    <div class="sidebar-status"><div class="status-dot" id="statusDot"></div><span id="statusText">Connecting...</span></div>
+  </nav>
+  <main class="main-content">
+    <header class="top-bar">
+      <h1>Playbook Manager</h1>
+    </header>
+
+    <!-- Playbook Cards -->
+    <div class="playbook-grid" id="playbookGrid">
+      <!-- Loaded dynamically -->
+    </div>
+
+    <!-- Execution History -->
+    <div class="table-card" style="margin-top:24px">
+      <div class="table-header"><h3>Execution History</h3></div>
+      <table class="data-table">
+        <thead><tr><th>Playbook</th><th>Alert ID</th><th>Steps</th><th>Duration</th><th>Status</th><th>Time</th></tr></thead>
+        <tbody>
+          {% for exec in executions %}
+          <tr>
+            <td><span class="pb-badge">{{ exec.playbook_name }}</span></td>
+            <td class="mono">{{ exec.alert_id[:8] if exec.alert_id else '—' }}...</td>
+            <td>{{ exec.steps_completed }}/{{ exec.steps_total }}</td>
+            <td>{{ "%.0f"|format(exec.execution_time_ms or 0) }}ms</td>
+            <td><span class="status-badge status-{{ exec.status.lower() }}">{{ exec.status }}</span></td>
+            <td class="time-cell">{{ exec.created_at.strftime('%m/%d %H:%M') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+const playbookInfo = {
+  phishing_response: { icon: '📧', color: '#f97316', desc: 'Automated phishing email containment and sender blocking' },
+  ransomware_response: { icon: '🔐', color: '#ef4444', desc: 'Critical ransomware isolation and eradication' },
+  brute_force_response: { icon: '🔑', color: '#eab308', desc: 'IP blocking and account protection automation' },
+  data_breach_response: { icon: '📤', color: '#ef4444', desc: 'Data exfiltration containment and legal notification' },
+  malware_containment: { icon: '🦠', color: '#f97316', desc: 'Malware process termination and forensic collection' },
+};
+
+fetch('/api/playbooks').then(r => r.json()).then(data => {
+  const grid = document.getElementById('playbookGrid');
+  data.playbooks.forEach(name => {
+    const info = playbookInfo[name] || { icon: '⚙️', color: '#3b82f6', desc: 'Automated response playbook' };
+    grid.innerHTML += `
+      <div class="playbook-card" style="border-left:3px solid ${info.color}">
+        <div class="pb-card-header">
+          <span class="pb-icon">${info.icon}</span>
+          <h3>${name.replace(/_/g, ' ').toUpperCase()}</h3>
+        </div>
+        <p class="pb-desc">${info.desc}</p>
+        <div class="pb-actions">
+          <button class="btn btn-simulate" onclick="testPlaybook('${name}')">▶ Test Run</button>
+        </div>
+      </div>`;
+  });
+});
+
+function testPlaybook(name) {
+  fetch('/api/playbooks/execute', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({playbook_name: name, alert_id: 'test-' + Date.now()})
+  }).then(r => r.json()).then(data => {
+    alert(`Playbook "${name}" executed!\nStatus: ${data.status || 'completed'}\nSteps: ${data.steps_completed || '?'}/${data.steps_total || '?'}`);
+    location.reload();
+  });
+}
+</script>
+</body>
+</html>

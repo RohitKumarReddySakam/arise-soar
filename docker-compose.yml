@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  arise-soar:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_DEBUG=0
+      - SECRET_KEY=dev-secret-change-in-production
+      - DATABASE_URL=sqlite:///arise_soar.db
+      - DEMO_MODE=true
+      # Add your API keys below (optional for enrichment features)
+      # - VIRUSTOTAL_API_KEY=your_key_here
+      # - ABUSEIPDB_API_KEY=your_key_here
+      # - SLACK_WEBHOOK_URL=your_webhook_here
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  data:

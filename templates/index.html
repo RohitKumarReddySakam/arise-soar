@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARISE SOAR | Tactical Security Operations</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP COMMAND BAR -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-emblem">⚔️</div>
+      <div>
+        <div class="brand-name">ARISE</div>
+        <span class="brand-class">SOAR · v2.0</span>
+      </div>
+    </div>
+    <nav class="main-nav">
+      <a href="/" class="nav-item active">◈ DASHBOARD</a>
+      <a href="/alerts" class="nav-item">⚡ ALERTS</a>
+      <a href="/cases" class="nav-item">◻ CASES</a>
+      <a href="/playbooks" class="nav-item">▶ PLAYBOOKS</a>
+    </nav>
+    <div class="topbar-right">
+      <div class="mttr-badge">MTTR: <strong>{{ mttr }}</strong></div>
+      <div class="status-cluster">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">CONNECTING</span>
+      </div>
+      <button class="btn btn-simulate" onclick="openSimulator()">▶ SIMULATE</button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- KPI GRID -->
+    <div class="kpi-grid">
+      <div class="kpi-card critical" data-label="TOTAL ALERTS">
+        <div class="kpi-icon">⚡</div>
+        <div class="kpi-data">
+          <span class="kpi-value" id="totalAlerts">{{ total_alerts }}</span>
+          <span class="kpi-label">Total Alerts</span>
+        </div>
+      </div>
+      <div class="kpi-card warning" data-label="OPEN CASES">
+        <div class="kpi-icon">◻</div>
+        <div class="kpi-data">
+          <span class="kpi-value" id="openCases">{{ open_cases }}</span>
+          <span class="kpi-label">Open Cases</span>
+        </div>
+      </div>
+      <div class="kpi-card danger" data-label="CRITICAL">
+        <div class="kpi-icon">☠</div>
+        <div class="kpi-data">
+          <span class="kpi-value" id="criticalAlerts">{{ critical_alerts }}</span>
+          <span class="kpi-label">Critical Alerts</span>
+        </div>
+      </div>
+      <div class="kpi-card success" data-label="RESOLVED">
+        <div class="kpi-icon">✓</div>
+        <div class="kpi-data">
+          <span class="kpi-value" id="resolvedToday">{{ resolved_today }}</span>
+          <span class="kpi-label">Resolved Today</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Alert Severity Distribution</h3>
+        <canvas id="severityChart" height="180"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Alert Type Breakdown</h3>
+        <canvas id="typeChart" height="180"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Case Status Overview</h3>
+        <canvas id="caseChart" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- TABLES ROW -->
+    <div class="tables-row">
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Recent Alerts</h3>
+          <a href="/alerts" class="view-all">VIEW ALL →</a>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Type</th><th>Severity</th><th>Source</th>
+              <th>ML Score</th><th>Status</th><th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="alertsBody">
+            {% for alert in recent_alerts %}
+            <tr>
+              <td><span class="type-badge">{{ alert.type }}</span></td>
+              <td><span class="sev-badge sev-{{ alert.severity.lower() }}">{{ alert.severity }}</span></td>
+              <td>{{ alert.source }}</td>
+              <td>
+                <div class="ml-bar">
+                  <div class="ml-fill" style="width:{{ [alert.ml_priority * 80, 80]|min|int }}px"></div>
+                  <span>{{ "%.0f"|format(alert.ml_priority * 100) }}%</span>
+                </div>
+              </td>
+              <td><span class="status-badge status-{{ alert.status.lower().replace(' ','_') }}">{{ alert.status }}</span></td>
+              <td class="time-cell">{{ alert.created_at.strftime('%H:%M:%S') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Active Cases</h3>
+          <a href="/cases" class="view-all">VIEW ALL →</a>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr><th>Case Title</th><th>Severity</th><th>Status</th><th>Assigned</th></tr>
+          </thead>
+          <tbody>
+            {% for case in recent_cases %}
+            <tr>
+              <td class="case-title">{{ case.title[:40] }}</td>
+              <td><span class="sev-badge sev-{{ case.severity.lower() }}">{{ case.severity }}</span></td>
+              <td><span class="status-badge">{{ case.status }}</span></td>
+              <td>{{ case.assigned_to }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LIVE FEED -->
+    <div class="live-feed-card">
+      <div class="table-header">
+        <h3>⬛ Live Alert Stream</h3>
+        <span class="live-indicator">● LIVE</span>
+      </div>
+      <div id="liveFeed" class="live-feed"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ATTACK SIMULATOR MODAL -->
+<div id="simulatorModal" class="modal">
+  <div class="modal-content">
+    <h2>⚔ ATTACK SIMULATOR</h2>
+    <p>Trigger a realistic attack scenario to test ARISE SOAR automated response</p>
+    <div class="sim-grid">
+      <button class="sim-btn" onclick="simulate('phishing')">📧 PHISHING CAMPAIGN</button>
+      <button class="sim-btn sim-critical" onclick="simulate('ransomware')">🔐 RANSOMWARE ATTACK</button>
+      <button class="sim-btn" onclick="simulate('brute_force')">🔑 SSH BRUTE FORCE</button>
+      <button class="sim-btn sim-critical" onclick="simulate('data_exfil')">📤 DATA EXFILTRATION</button>
+      <button class="sim-btn sim-critical" onclick="simulate('lateral_movement')">🕸 LATERAL MOVEMENT</button>
+    </div>
+    <button class="btn btn-close" onclick="closeSimulator()">✕ CLOSE</button>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+  const socket = io();
+
+  socket.on('connect', () => {
+    document.getElementById('statusDot').classList.add('connected');
+    document.getElementById('statusText').textContent = 'CONNECTED';
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('statusDot').classList.remove('connected');
+    document.getElementById('statusText').textContent = 'OFFLINE';
+  });
+
+  socket.on('new_alert', (alert) => {
+    const feed = document.getElementById('liveFeed');
+    const item = document.createElement('div');
+    item.className = 'live-feed-item';
+    item.innerHTML = `
+      <span class="sev-badge sev-${alert.severity.toLowerCase()}">${alert.severity}</span>
+      <span class="type-badge">${alert.type}</span>
+      <span style="flex:1;color:var(--text)">${alert.description || '—'}</span>
+      <span class="time-cell">${new Date().toLocaleTimeString()}</span>
+    `;
+    feed.insertBefore(item, feed.firstChild);
+    if (feed.children.length > 20) feed.removeChild(feed.lastChild);
+  });
+
+  function openSimulator() { document.getElementById('simulatorModal').classList.add('open'); }
+  function closeSimulator() { document.getElementById('simulatorModal').classList.remove('open'); }
+
+  function simulate(type) {
+    closeSimulator();
+    fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attack_type: type })
+    }).then(r => r.json()).then(() => {
+      setTimeout(() => location.reload(), 2000);
+    });
+  }
+
+  // Init charts
+  fetch('/api/metrics').then(r => r.json()).then(data => {
+    const chartOpts = {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#7a9cb0', font: { family: 'Rajdhani', size: 11 } } } }
+    };
+
+    const sevData = data.severity_distribution;
+    new Chart(document.getElementById('severityChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(sevData),
+        datasets: [{
+          data: Object.values(sevData),
+          backgroundColor: ['#ff2d2d','#ff8c00','#22d3ee','#39ff14'],
+          borderWidth: 0
+        }]
+      },
+      options: chartOpts
+    });
+
+    const typeData = data.type_distribution;
+    new Chart(document.getElementById('typeChart'), {
+      type: 'bar',
+      data: {
+        labels: Object.keys(typeData).map(k => k.replace(/_/g,' ')),
+        datasets: [{
+          data: Object.values(typeData),
+          backgroundColor: 'rgba(255,140,0,0.3)',
+          borderColor: '#ff8c00',
+          borderWidth: 1,
+          borderRadius: 2
+        }]
+      },
+      options: {
+        ...chartOpts,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#3a5c70', font: { family: 'Rajdhani' } }, grid: { color: 'rgba(255,140,0,0.05)' } },
+          y: { ticks: { color: '#3a5c70', font: { family: 'Rajdhani' } }, grid: { color: 'rgba(255,140,0,0.05)' } }
+        }
+      }
+    });
+
+    const caseData = data.case_status_distribution;
+    new Chart(document.getElementById('caseChart'), {
+      type: 'pie',
+      data: {
+        labels: Object.keys(caseData),
+        datasets: [{ data: Object.values(caseData), backgroundColor: ['#ff8c00','#22d3ee','#39ff14'], borderWidth: 0 }]
+      },
+      options: chartOpts
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARISE SOAR | Cases</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo"><span class="logo-icon">⚔️</span><span class="logo-text">ARISE</span><span class="logo-sub">SOAR</span></div>
+    <ul class="nav-links">
+      <li><a href="/"><span>📊</span> Dashboard</a></li>
+      <li><a href="/alerts"><span>🚨</span> Alerts</a></li>
+      <li class="active"><a href="/cases"><span>📁</span> Cases</a></li>
+      <li><a href="/playbooks"><span>⚙️</span> Playbooks</a></li>
+    </ul>
+    <div class="sidebar-status"><div class="status-dot" id="statusDot"></div><span id="statusText">Connecting...</span></div>
+  </nav>
+  <main class="main-content">
+    <header class="top-bar">
+      <h1>Case Management</h1>
+      <button class="btn btn-simulate" onclick="openNewCase()">+ New Case</button>
+    </header>
+
+    <div class="table-card">
+      <table class="data-table">
+        <thead>
+          <tr><th>Case ID</th><th>Title</th><th>Severity</th><th>Status</th><th>Assigned To</th><th>MITRE</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for case in cases %}
+          <tr>
+            <td class="mono">{{ case.id[:8] }}...</td>
+            <td class="case-title">{{ case.title }}</td>
+            <td><span class="sev-badge sev-{{ case.severity.lower() if case.severity else 'medium' }}">{{ case.severity or 'MEDIUM' }}</span></td>
+            <td><span class="status-badge status-{{ case.status.lower().replace(' ','_') }}">{{ case.status }}</span></td>
+            <td>{{ case.assigned_to }}</td>
+            <td>
+              {% set mitre = case.mitre_tactics | from_json if case.mitre_tactics else [] %}
+              {% if mitre %}<span class="mitre-badge">{{ mitre|length }} tactics</span>{% else %}<span class="na">—</span>{% endif %}
+            </td>
+            <td class="time-cell">{{ case.created_at.strftime('%m/%d/%Y') }}</td>
+            <td>
+              {% if case.status != 'CLOSED' %}
+              <button class="btn-sm btn-green" onclick="closeCase('{{ case.id }}')">Close</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- New Case Modal -->
+<div id="newCaseModal" class="modal" style="display:none">
+  <div class="modal-content">
+    <h2>Create New Case</h2>
+    <div class="form-group"><label>Title</label><input id="cTitle" class="form-input" placeholder="IR-2025-XXXX: Incident Title"></div>
+    <div class="form-group"><label>Description</label><textarea id="cDesc" class="form-input" rows="3"></textarea></div>
+    <div class="form-group"><label>Severity</label>
+      <select id="cSeverity" class="form-input"><option>CRITICAL</option><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option></select>
+    </div>
+    <div class="form-group"><label>Assigned To</label><input id="cAssigned" class="form-input" value="SOC Team"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-simulate" onclick="submitCase()">Create Case</button>
+      <button class="btn btn-close" onclick="closeNewCase()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+function openNewCase() { document.getElementById('newCaseModal').style.display = 'flex'; }
+function closeNewCase() { document.getElementById('newCaseModal').style.display = 'none'; }
+
+function submitCase() {
+  const payload = {
+    title: document.getElementById('cTitle').value,
+    description: document.getElementById('cDesc').value,
+    severity: document.getElementById('cSeverity').value,
+    assigned_to: document.getElementById('cAssigned').value,
+  };
+  fetch('/api/cases', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(() => { closeNewCase(); location.reload(); });
+}
+
+function closeCase(id) {
+  fetch(`/api/cases/${id}`, {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'CLOSED', timeline_entry:'Case closed by analyst'})
+  }).then(() => location.reload());
+}
+</script>
+</body>
+</html>

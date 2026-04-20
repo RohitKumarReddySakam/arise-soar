@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARISE SOAR | Alerts</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo"><span class="logo-icon">⚔️</span><span class="logo-text">ARISE</span><span class="logo-sub">SOAR</span></div>
+    <ul class="nav-links">
+      <li><a href="/"><span>📊</span> Dashboard</a></li>
+      <li class="active"><a href="/alerts"><span>🚨</span> Alerts</a></li>
+      <li><a href="/cases"><span>📁</span> Cases</a></li>
+      <li><a href="/playbooks"><span>⚙️</span> Playbooks</a></li>
+    </ul>
+    <div class="sidebar-status"><div class="status-dot" id="statusDot"></div><span id="statusText">Connecting...</span></div>
+  </nav>
+  <main class="main-content">
+    <header class="top-bar">
+      <h1>Alert Management</h1>
+      <div class="header-right">
+        <button class="btn btn-simulate" onclick="openCreateAlert()">+ Create Alert</button>
+      </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <select id="filterSeverity" onchange="filterAlerts()" class="filter-select">
+        <option value="">All Severities</option>
+        <option value="CRITICAL">Critical</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="LOW">Low</option>
+      </select>
+      <select id="filterStatus" onchange="filterAlerts()" class="filter-select">
+        <option value="">All Statuses</option>
+        <option value="NEW">New</option>
+        <option value="IN_PROGRESS">In Progress</option>
+        <option value="RESOLVED">Resolved</option>
+      </select>
+      <input type="text" id="searchAlerts" placeholder="Search alerts..." class="filter-input" oninput="filterAlerts()">
+    </div>
+
+    <div class="table-card">
+      <table class="data-table" id="alertsTable">
+        <thead>
+          <tr>
+            <th>ID</th><th>Type</th><th>Severity</th><th>Source</th>
+            <th>ML Score</th><th>Playbook</th><th>Status</th><th>Time</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="alertsBody">
+          {% for alert in alerts %}
+          <tr data-severity="{{ alert.severity }}" data-status="{{ alert.status }}">
+            <td class="mono">{{ alert.id[:8] }}...</td>
+            <td><span class="type-badge">{{ alert.type }}</span></td>
+            <td><span class="sev-badge sev-{{ alert.severity.lower() }}">{{ alert.severity }}</span></td>
+            <td>{{ alert.source }}</td>
+            <td>
+              <div class="ml-bar">
+                <div class="ml-fill" style="width:{{ (alert.ml_priority * 100)|int }}%"></div>
+                <span>{{ alert.ml_label }}</span>
+              </div>
+            </td>
+            <td>
+              {% if alert.playbook_triggered %}
+              <span class="pb-badge">▶ {{ alert.playbook_triggered }}</span>
+              {% else %}<span class="na">—</span>{% endif %}
+            </td>
+            <td><span class="status-badge status-{{ alert.status.lower().replace(' ','_') }}">{{ alert.status }}</span></td>
+            <td class="time-cell">{{ alert.created_at.strftime('%m/%d %H:%M') }}</td>
+            <td>
+              <button class="btn-sm" onclick="resolveAlert('{{ alert.id }}')">Resolve</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Create Alert Modal -->
+<div id="createAlertModal" class="modal" style="display:none">
+  <div class="modal-content">
+    <h2>Create Manual Alert</h2>
+    <div class="form-group"><label>Type</label><input id="aType" class="form-input" value="phishing"></div>
+    <div class="form-group"><label>Severity</label>
+      <select id="aSeverity" class="form-input">
+        <option>HIGH</option><option>CRITICAL</option><option>MEDIUM</option><option>LOW</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Source</label><input id="aSource" class="form-input" value="manual"></div>
+    <div class="form-group"><label>Description</label><textarea id="aDesc" class="form-input" rows="3"></textarea></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-simulate" onclick="submitAlert()">Submit Alert</button>
+      <button class="btn btn-close" onclick="closeCreateAlert()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+function filterAlerts() {
+  const sev = document.getElementById('filterSeverity').value;
+  const status = document.getElementById('filterStatus').value;
+  const search = document.getElementById('searchAlerts').value.toLowerCase();
+  document.querySelectorAll('#alertsBody tr').forEach(row => {
+    const matchSev = !sev || row.dataset.severity === sev;
+    const matchStatus = !status || row.dataset.status === status;
+    const matchSearch = !search || row.textContent.toLowerCase().includes(search);
+    row.style.display = (matchSev && matchStatus && matchSearch) ? '' : 'none';
+  });
+}
+
+function resolveAlert(id) {
+  fetch(`/api/alerts/${id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:'RESOLVED'})})
+    .then(() => location.reload());
+}
+
+function openCreateAlert() { document.getElementById('createAlertModal').style.display = 'flex'; }
+function closeCreateAlert() { document.getElementById('createAlertModal').style.display = 'none'; }
+
+function submitAlert() {
+  const payload = {
+    type: document.getElementById('aType').value,
+    severity: document.getElementById('aSeverity').value,
+    source: document.getElementById('aSource').value,
+    description: document.getElementById('aDesc').value,
+  };
+  fetch('/api/alerts', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(() => { closeCreateAlert(); location.reload(); });
+}
+</script>
+</body>
+</html>

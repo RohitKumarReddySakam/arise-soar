@@ -1,0 +1,46 @@
+name: data_breach_response
+description: Data exfiltration containment and breach response playbook
+trigger: data_exfiltration
+severity: CRITICAL
+avg_execution_time: 90s
+mitre_tactics:
+  - "TA0010 - Exfiltration"
+  - "T1041 - Exfiltration Over C2 Channel"
+  - "TA0009 - Collection"
+
+steps:
+  - action: block_ip
+    description: Block exfiltration destination IP at all egress points
+    required: true
+
+  - action: isolate_host
+    description: Isolate source host from network to stop active exfiltration
+    required: true
+
+  - action: collect_forensics
+    description: Capture network flows, file access logs, and process tree
+    required: true
+
+  - action: preserve_evidence
+    description: Hash and preserve all collected evidence
+    required: true
+
+  - action: scan_network
+    description: Identify scope of data accessed and affected systems
+    required: true
+
+  - action: notify_team
+    description: Alert CISO, SOC Lead, and IR team immediately
+    required: true
+
+  - action: create_ticket
+    description: Create P0 incident with full evidence chain
+    required: true
+
+  - action: notify_legal
+    description: Notify legal and compliance teams — potential GDPR/CCPA obligations
+    required: true
+
+  - action: revoke_tokens
+    description: Revoke tokens and credentials of compromised accounts
+    required: true

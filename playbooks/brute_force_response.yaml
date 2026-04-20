@@ -1,0 +1,33 @@
+name: brute_force_response
+description: Automated brute force attack blocking and account protection
+trigger: brute_force
+severity: HIGH
+avg_execution_time: 20s
+mitre_tactics:
+  - "TA0006 - Credential Access"
+  - "T1110 - Brute Force"
+
+steps:
+  - action: block_ip
+    description: Block attacking IP at perimeter firewall and WAF
+    required: true
+
+  - action: enrich_ioc
+    description: Query AbuseIPDB and Shodan for attacker IP intelligence
+    required: true
+
+  - action: force_password_reset
+    description: Force password reset for targeted user accounts
+    required: true
+
+  - action: enable_mfa
+    description: Enforce MFA for all affected user accounts
+    required: true
+
+  - action: notify_team
+    description: Alert security team via Slack
+    required: true
+
+  - action: create_ticket
+    description: Log incident in SIEM and create tracking ticket
+    required: false

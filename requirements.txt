@@ -1,7 +1,7 @@
 flask==3.0.0
 flask-sqlalchemy==3.1.1
 flask-socketio==5.3.6
-eventlet==0.35.1
+eventlet==0.41.0
 pyyaml==6.0.1
 requests==2.31.0
 scikit-learn==1.4.0
